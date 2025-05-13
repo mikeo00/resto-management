@@ -1,214 +1,154 @@
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 
-#define MAX_STRING 256
-#define MAX_DESCRIPTION 512
-#define INITIAL_CAPACITY 10
-#define MENU_FILE "menu.txt"
-#define ORDERS_FILE "completed_orders.txt"
-
+// Basic structure for a menu item
 typedef struct {
     int id;
-    char name[MAX_STRING];
-    char description[MAX_DESCRIPTION];
+    char name[256];
+    char description[512];
     float price;
 } MenuItem;
 
+// Dynamic array to store menu items
 typedef struct {
     MenuItem* items;
     int size;
     int capacity;
-} DynamicArrayList;
+} Menu;
 
+// Structure for order items (linked list)
 typedef struct OrderItem {
     MenuItem* item;
     struct OrderItem* next;
 } OrderItem;
 
-// Order structure
+// Structure for orders
 typedef struct {
     int id;
-    char customerName[MAX_STRING];
+    char customerName[256];
     OrderItem* items;
     bool completed;
     float total;
 } Order;
 
-// Node structure for Queue and Stack
+// Node structure for orders in queue/stack
 typedef struct Node {
     Order* order;
     struct Node* next;
 } Node;
 
-// Queue structure for active orders
+// Queue for active orders
 typedef struct {
     Node* front;
     Node* rear;
     int size;
-} Queue;
+} OrderQueue;
 
-// Stack structure for completed orders
+// Stack for completed orders
 typedef struct {
     Node* top;
     int size;
-} Stack;
+} OrderStack;
 
-/* Global Variables */
-DynamicArrayList menuList;
-Queue activeOrders;
-Stack completedOrders;
-int orderIdCounter = 1;
+// Global variables
+Menu menu;
+OrderQueue activeOrders;
+OrderStack completedOrders;
+int nextOrderId = 1;
 
-/* Function Prototypes */
-
-// DynamicArrayList operations
-void initDynamicArrayList();
-void addMenuItem(int id, const char* name, const char* description, float price);
-void removeMenuItem(int id);
-MenuItem* findMenuItem(int id);
-void resetMenu();
-void destroyDynamicArrayList();
-
-// Queue operations
-void initQueue();
-void enqueue(Order* order);
-Order* dequeue();
-bool isQueueEmpty();
-void displayQueue();
-void destroyQueue();
-Order* findOrderInQueue(int id);
-void removeOrderFromQueue(int id);
-
-// Stack operations
-void initStack();
-void push(Order* order);
-Order* pop();
-bool isStackEmpty();
-void displayStack();
-void destroyStack();
-
-// File operations
-bool loadMenuFromFile(const char* filename);
-bool saveMenuToFile(const char* filename);
-bool saveCompletedOrdersToFile(const char* filename);
-
-// Application operations
-void displayMenu();
-void processAddMenuItem();
-void processDeleteMenuItem();
-void processResetMenu();
-void processAddOrder();
-void processNextOrder();
-void displayOrders();
-void processDeleteOrder();
-void calculateTotalRevenue();
-void displayMainMenu();
-
-/* Implementation of DynamicArrayList operations */
-
-void initDynamicArrayList() {
-    menuList.items = (MenuItem*)malloc(INITIAL_CAPACITY * sizeof(MenuItem));
-    if (menuList.items == NULL) {
-        fprintf(stderr, "Memory allocation failed\n");
-        exit(EXIT_FAILURE);
-    }
-    menuList.size = 0;
-    menuList.capacity = INITIAL_CAPACITY;
+// Initialize the menu with initial capacity
+void initMenu() {
+    menu.items = malloc(10 * sizeof(MenuItem));
+    menu.size = 0;
+    menu.capacity = 10;
 }
 
+// Add a new menu item
 void addMenuItem(int id, const char* name, const char* description, float price) {
-    // Check if id already exists
-    for (int i = 0; i < menuList.size; i++) {
-        if (menuList.items[i].id == id) {
-            printf("Item with ID %d already exists. Choose a different ID.\n", id);
+    // Check for duplicate ID
+    for (int i = 0; i < menu.size; i++) {
+        if (menu.items[i].id == id) {
+            printf("Item with ID %d already exists.\n", id);
             return;
         }
     }
 
-    // Resize if necessary
-    if (menuList.size >= menuList.capacity) {
-        menuList.capacity *= 2;
-        MenuItem* temp = (MenuItem*)realloc(menuList.items, menuList.capacity * sizeof(MenuItem));
-        if (temp == NULL) {
-            fprintf(stderr, "Memory reallocation failed\n");
-            exit(EXIT_FAILURE);
-        }
-        menuList.items = temp;
+    // Resize if needed
+    if (menu.size >= menu.capacity) {
+        menu.capacity *= 2;
+        menu.items = realloc(menu.items, menu.capacity * sizeof(MenuItem));
     }
 
     // Add the new item
-    menuList.items[menuList.size].id = id;
-    strncpy(menuList.items[menuList.size].name, name, MAX_STRING - 1);
-    menuList.items[menuList.size].name[MAX_STRING - 1] = '\0';
-    strncpy(menuList.items[menuList.size].description, description, MAX_DESCRIPTION - 1);
-    menuList.items[menuList.size].description[MAX_DESCRIPTION - 1] = '\0';
-    menuList.items[menuList.size].price = price;
-    menuList.size++;
+    menu.items[menu.size].id = id;
+    strncpy(menu.items[menu.size].name, name, 255);
+    strncpy(menu.items[menu.size].description, description, 511);
+    menu.items[menu.size].price = price;
+    menu.size++;
 }
 
+// Remove a menu item
 void removeMenuItem(int id) {
-    int found = -1;
+    int index = -1;
 
     // Find the item
-    for (int i = 0; i < menuList.size; i++) {
-        if (menuList.items[i].id == id) {
-            found = i;
+    for (int i = 0; i < menu.size; i++) {
+        if (menu.items[i].id == id) {
+            index = i;
             break;
         }
     }
 
-    if (found == -1) {
+    if (index == -1) {
         printf("Item with ID %d not found.\n", id);
         return;
     }
 
     // Shift remaining elements
-    for (int i = found; i < menuList.size - 1; i++) {
-        menuList.items[i] = menuList.items[i + 1];
+    for (int i = index; i < menu.size - 1; i++) {
+        menu.items[i] = menu.items[i + 1];
     }
 
-    menuList.size--;
-    printf("Item with ID %d removed successfully.\n", id);
+    menu.size--;
+    printf("Item with ID %d removed.\n", id);
 }
 
+// Find a menu item by ID
 MenuItem* findMenuItem(int id) {
-    for (int i = 0; i < menuList.size; i++) {
-        if (menuList.items[i].id == id) {
-            return &menuList.items[i];
+    for (int i = 0; i < menu.size; i++) {
+        if (menu.items[i].id == id) {
+            return &menu.items[i];
         }
     }
     return NULL;
 }
 
+// Clear the menu
 void resetMenu() {
-    menuList.size = 0;
+    menu.size = 0;
     printf("Menu has been reset.\n");
 }
 
-void destroyDynamicArrayList() {
-    free(menuList.items);
-    menuList.items = NULL;
-    menuList.size = 0;
-    menuList.capacity = 0;
-}
-
-/* Implementation of Queue operations */
-
-void initQueue() {
+// Initialize order queue
+void initOrderQueue() {
     activeOrders.front = NULL;
     activeOrders.rear = NULL;
     activeOrders.size = 0;
 }
 
-void enqueue(Order* order) {
-    Node* newNode = (Node*)malloc(sizeof(Node));
-    if (newNode == NULL) {
-        fprintf(stderr, "Memory allocation failed\n");
-        exit(EXIT_FAILURE);
+// Check if queue is empty
+bool isQueueEmpty() {
+    return activeOrders.front == NULL;
+}
+
+// Add an order to the queue
+void enqueueOrder(Order* order) {
+    Node* newNode = malloc(sizeof(Node));
+    if (!newNode) {
+        printf("Memory allocation failed\n");
+        exit(1);
     }
 
     newNode->order = order;
@@ -225,7 +165,8 @@ void enqueue(Order* order) {
     activeOrders.size++;
 }
 
-Order* dequeue() {
+// Remove and return the first order from the queue
+Order* dequeueOrder() {
     if (isQueueEmpty()) {
         return NULL;
     }
@@ -244,34 +185,43 @@ Order* dequeue() {
     return order;
 }
 
-bool isQueueEmpty() {
-    return activeOrders.front == NULL;
+// Initialize order stack
+void initOrderStack() {
+    completedOrders.top = NULL;
+    completedOrders.size = 0;
 }
 
-Order* findOrderInQueue(int id) {
-    Node* current = activeOrders.front;
+// Check if stack is empty
+bool isStackEmpty() {
+    return completedOrders.top == NULL;
+}
 
-    while (current != NULL) {
-        if (current->order->id == id) {
-            return current->order;
-        }
-        current = current->next;
+// Push an order onto the stack
+void pushOrder(Order* order) {
+    Node* newNode = malloc(sizeof(Node));
+    if (!newNode) {
+        printf("Memory allocation failed\n");
+        exit(1);
     }
 
-    return NULL;
+    newNode->order = order;
+    newNode->next = completedOrders.top;
+    completedOrders.top = newNode;
+    completedOrders.size++;
 }
 
-void removeOrderFromQueue(int id) {
+// Find and remove an order from queue by ID
+void cancelOrder(int id) {
     if (isQueueEmpty()) {
-        printf("No active orders to delete.\n");
+        printf("No active orders to cancel.\n");
         return;
     }
 
     Node* current = activeOrders.front;
     Node* prev = NULL;
 
-    // If the first node is the target
-    if (current != NULL && current->order->id == id) {
+    // If the first order is the target
+    if (current && current->order->id == id) {
         activeOrders.front = current->next;
 
         // If this was the only node, update rear as well
@@ -279,9 +229,9 @@ void removeOrderFromQueue(int id) {
             activeOrders.rear = NULL;
         }
 
-        // Free order items memory
+        // Free order items
         OrderItem* itemCurrent = current->order->items;
-        while (itemCurrent != NULL) {
+        while (itemCurrent) {
             OrderItem* temp = itemCurrent;
             itemCurrent = itemCurrent->next;
             free(temp);
@@ -296,18 +246,18 @@ void removeOrderFromQueue(int id) {
     }
 
     // Search for the order in the rest of the queue
-    while (current != NULL && current->order->id != id) {
+    while (current && current->order->id != id) {
         prev = current;
         current = current->next;
     }
 
     // If order was not found
-    if (current == NULL) {
+    if (!current) {
         printf("Order with ID %d not found.\n", id);
         return;
     }
 
-    // Update the rear pointer if removing the last node
+    // Update rear pointer if removing the last node
     if (current == activeOrders.rear) {
         activeOrders.rear = prev;
     }
@@ -315,9 +265,9 @@ void removeOrderFromQueue(int id) {
     // Remove the node
     prev->next = current->next;
 
-    // Free order items memory
+    // Free order items
     OrderItem* itemCurrent = current->order->items;
-    while (itemCurrent != NULL) {
+    while (itemCurrent) {
         OrderItem* temp = itemCurrent;
         itemCurrent = itemCurrent->next;
         free(temp);
@@ -330,135 +280,12 @@ void removeOrderFromQueue(int id) {
     printf("Order with ID %d has been cancelled.\n", id);
 }
 
-void displayQueue() {
-    if (isQueueEmpty()) {
-        printf("No active orders.\n");
-        return;
-    }
-
-    printf("\n--- Active Orders ---\n");
-    Node* current = activeOrders.front;
-
-    while (current != NULL) {
-        Order* order = current->order;
-        printf("Order ID: %d, Customer: %s\n", order->id, order->customerName);
-        printf("Items:\n");
-
-        OrderItem* itemCurrent = order->items;
-        while (itemCurrent != NULL) {
-            printf("- %s ($%.2f)\n", itemCurrent->item->name, itemCurrent->item->price);
-            itemCurrent = itemCurrent->next;
-        }
-
-        printf("Status: Pending\n\n");
-        current = current->next;
-    }
-}
-
-void destroyQueue() {
-    while (!isQueueEmpty()) {
-        Order* order = dequeue();
-
-        // Free order items
-        OrderItem* current = order->items;
-        while (current != NULL) {
-            OrderItem* temp = current;
-            current = current->next;
-            free(temp);
-        }
-
-        free(order);
-    }
-}
-
-/* Implementation of Stack operations */
-
-void initStack() {
-    completedOrders.top = NULL;
-    completedOrders.size = 0;
-}
-
-void push(Order* order) {
-    Node* newNode = (Node*)malloc(sizeof(Node));
-    if (newNode == NULL) {
-        fprintf(stderr, "Memory allocation failed\n");
-        exit(EXIT_FAILURE);
-    }
-
-    newNode->order = order;
-    newNode->next = completedOrders.top;
-    completedOrders.top = newNode;
-    completedOrders.size++;
-}
-
-Order* pop() {
-    if (isStackEmpty()) {
-        return NULL;
-    }
-
-    Node* temp = completedOrders.top;
-    Order* order = temp->order;
-
-    completedOrders.top = completedOrders.top->next;
-    free(temp);
-    completedOrders.size--;
-
-    return order;
-}
-
-bool isStackEmpty() {
-    return completedOrders.top == NULL;
-}
-
-void displayStack() {
-    if (isStackEmpty()) {
-        printf("No completed orders.\n");
-        return;
-    }
-
-    printf("\n--- Completed Orders ---\n");
-    Node* current = completedOrders.top;
-
-    while (current != NULL) {
-        Order* order = current->order;
-        printf("Order ID: %d, Customer: %s\n", order->id, order->customerName);
-        printf("Items:\n");
-
-        OrderItem* itemCurrent = order->items;
-        while (itemCurrent != NULL) {
-            printf("- %s ($%.2f)\n", itemCurrent->item->name, itemCurrent->item->price);
-            itemCurrent = itemCurrent->next;
-        }
-
-        printf("Status: Completed\n");
-        printf("Total: $%.2f\n\n", order->total);
-        current = current->next;
-    }
-}
-
-void destroyStack() {
-    while (!isStackEmpty()) {
-        Order* order = pop();
-
-        // Free order items
-        OrderItem* current = order->items;
-        while (current != NULL) {
-            OrderItem* temp = current;
-            current = current->next;
-            free(temp);
-        }
-
-        free(order);
-    }
-}
-
-/* Implementation of File operations */
-
-bool loadMenuFromFile(const char* filename) {
+// Load menu from file
+void loadMenu(const char* filename) {
     FILE* file = fopen(filename, "r");
-    if (file == NULL) {
+    if (!file) {
         printf("Could not open file %s. Creating a new menu.\n", filename);
-        return false;
+        return;
     }
 
     char line[1024];
@@ -468,12 +295,7 @@ bool loadMenuFromFile(const char* filename) {
     resetMenu();
 
     while (fgets(line, sizeof(line), file)) {
-        int id;
-        char name[MAX_STRING];
-        char description[MAX_DESCRIPTION];
-        float price;
-
-        // Remove newline character if present
+        // Remove newline character
         size_t len = strlen(line);
         if (len > 0 && line[len - 1] == '\n') {
             line[len - 1] = '\0';
@@ -481,131 +303,126 @@ bool loadMenuFromFile(const char* filename) {
 
         // Parse line using comma as delimiter
         token = strtok(line, ",");
-        if (token == NULL) continue;
-        id = atoi(token);
+        if (!token) continue;
+        int id = atoi(token);
 
         token = strtok(NULL, ",");
-        if (token == NULL) continue;
-        strncpy(name, token, MAX_STRING - 1);
-        name[MAX_STRING - 1] = '\0';
+        if (!token) continue;
+        char name[256];
+        strncpy(name, token, 255);
+        name[255] = '\0';
 
         token = strtok(NULL, ",");
-        if (token == NULL) continue;
-        strncpy(description, token, MAX_DESCRIPTION - 1);
-        description[MAX_DESCRIPTION - 1] = '\0';
+        if (!token) continue;
+        char description[512];
+        strncpy(description, token, 511);
+        description[511] = '\0';
 
         token = strtok(NULL, ",");
-        if (token == NULL) continue;
-        price = atof(token);
+        if (!token) continue;
+        float price = atof(token);
 
         addMenuItem(id, name, description, price);
     }
 
     fclose(file);
-    printf("Menu loaded successfully from %s.\n", filename);
-    return true;
+    printf("Menu loaded from %s.\n", filename);
 }
 
-bool saveMenuToFile(const char* filename) {
+// Save menu to file
+void saveMenu(const char* filename) {
     FILE* file = fopen(filename, "w");
-    if (file == NULL) {
+    if (!file) {
         printf("Could not open file %s for writing.\n", filename);
-        return false;
+        return;
     }
 
-    for (int i = 0; i < menuList.size; i++) {
+    for (int i = 0; i < menu.size; i++) {
         fprintf(file, "%d,%s,%s,%.2f\n",
-            menuList.items[i].id,
-            menuList.items[i].name,
-            menuList.items[i].description,
-            menuList.items[i].price);
+            menu.items[i].id,
+            menu.items[i].name,
+            menu.items[i].description,
+            menu.items[i].price);
     }
 
     fclose(file);
-    printf("Menu saved successfully to %s.\n", filename);
-    return true;
+    printf("Menu saved to %s.\n", filename);
 }
 
-bool saveCompletedOrdersToFile(const char* filename) {
+// Save completed orders to file
+void saveOrders(const char* filename) {
     FILE* file = fopen(filename, "w");
-    if (file == NULL) {
+    if (!file) {
         printf("Could not open file %s for writing.\n", filename);
-        return false;
+        return;
     }
 
-    // Create a temp stack to restore completed orders after writing
-    Stack tempStack;
-    tempStack.top = NULL;
-    tempStack.size = 0;
+    // Temporary stack to restore orders after writing
+    OrderStack tempStack = {NULL, 0};
 
     fprintf(file, "--- Completed Orders ---\n\n");
 
-    // Pop all items from completedOrders, write them to file, and push to tempStack
+    // Process all completed orders
     while (!isStackEmpty()) {
-        Order* order = pop();
+        Order* order = completedOrders.top->order;
+        completedOrders.top = completedOrders.top->next;
+        completedOrders.size--;
 
         fprintf(file, "Order ID: %d\n", order->id);
         fprintf(file, "Customer: %s\n", order->customerName);
         fprintf(file, "Items:\n");
 
-        OrderItem* itemCurrent = order->items;
-        while (itemCurrent != NULL) {
-            fprintf(file, "- %s ($%.2f)\n", itemCurrent->item->name, itemCurrent->item->price);
-            itemCurrent = itemCurrent->next;
+        OrderItem* item = order->items;
+        while (item) {
+            fprintf(file, "- %s ($%.2f)\n", item->item->name, item->item->price);
+            item = item->next;
         }
 
         fprintf(file, "Total: $%.2f\n\n", order->total);
 
-        // Push to temporary stack
-        Node* newNode = (Node*)malloc(sizeof(Node));
-        if (newNode == NULL) {
-            fprintf(stderr, "Memory allocation failed\n");
-            exit(EXIT_FAILURE);
-        }
-
+        // Save to temp stack
+        Node* newNode = malloc(sizeof(Node));
         newNode->order = order;
         newNode->next = tempStack.top;
         tempStack.top = newNode;
         tempStack.size++;
     }
 
-    // Restore completed orders from tempStack
-    while (tempStack.top != NULL) {
+    // Restore from temp stack
+    while (tempStack.top) {
         Node* temp = tempStack.top;
-        Order* order = temp->order;
-
-        push(order);
-
         tempStack.top = tempStack.top->next;
-        free(temp);
+
+        temp->next = completedOrders.top;
+        completedOrders.top = temp;
+        completedOrders.size++;
     }
 
     fclose(file);
-    printf("Orders saved successfully to %s.\n", filename);
-    return true;
+    printf("Orders saved to %s.\n", filename);
 }
 
-/* Implementation of Application operations */
-
+// Display the menu
 void displayMenu() {
     printf("\n--- Menu Items ---\n");
-    if (menuList.size == 0) {
+    if (menu.size == 0) {
         printf("No menu items available.\n");
         return;
     }
 
-    for (int i = 0; i < menuList.size; i++) {
+    for (int i = 0; i < menu.size; i++) {
         printf("ID: %d, Name: %s, Price: $%.2f\n",
-            menuList.items[i].id,
-            menuList.items[i].name,
-            menuList.items[i].price);
+            menu.items[i].id,
+            menu.items[i].name,
+            menu.items[i].price);
     }
 }
 
-void processAddMenuItem() {
+// Add a new menu item (interactive)
+void addMenuItemInteractive() {
     int id;
-    char name[MAX_STRING];
-    char description[MAX_DESCRIPTION];
+    char name[256];
+    char description[512];
     float price;
 
     printf("Enter menu item ID: ");
@@ -613,11 +430,11 @@ void processAddMenuItem() {
     getchar(); // Consume newline
 
     printf("Enter menu item name: ");
-    fgets(name, MAX_STRING, stdin);
+    fgets(name, sizeof(name), stdin);
     name[strcspn(name, "\n")] = 0; // Remove newline
 
     printf("Enter menu item description: ");
-    fgets(description, MAX_DESCRIPTION, stdin);
+    fgets(description, sizeof(description), stdin);
     description[strcspn(description, "\n")] = 0; // Remove newline
 
     printf("Enter menu item price: ");
@@ -628,66 +445,43 @@ void processAddMenuItem() {
     printf("Menu item added successfully!\n");
 }
 
-void processDeleteMenuItem() {
-    int id;
-
-    printf("Enter the ID of the menu item to delete: ");
-    scanf("%d", &id);
-    getchar(); // Consume newline
-
-    removeMenuItem(id);
-}
-
-void processResetMenu() {
-    char confirmation;
-
-    printf("Are you sure you want to reset the menu? This will delete all menu items. (y/n): ");
-    scanf(" %c", &confirmation);
-    getchar(); // Consume newline
-
-    if (confirmation == 'y' || confirmation == 'Y') {
-        resetMenu();
-    } else {
-        printf("Menu reset cancelled.\n");
-    }
-}
-
-void processAddOrder() {
-    char customerName[MAX_STRING];
+// Create a new order
+void createOrder() {
+    char customerName[256];
     int itemId;
     OrderItem* head = NULL;
     OrderItem* tail = NULL;
     float total = 0.0;
 
     printf("Enter customer name: ");
-    fgets(customerName, MAX_STRING, stdin);
+    fgets(customerName, sizeof(customerName), stdin);
     customerName[strcspn(customerName, "\n")] = 0; // Remove newline
 
-    printf("Enter item IDs (0 to finish): ");
+    printf("Enter item IDs (0 to finish):\n");
 
     while (1) {
         scanf("%d", &itemId);
         if (itemId == 0) break;
 
-        MenuItem* menuItem = findMenuItem(itemId);
-        if (menuItem == NULL) {
-            printf("Item with ID %d not found. Please try again.\n", itemId);
+        MenuItem* item = findMenuItem(itemId);
+        if (!item) {
+            printf("Item with ID %d not found. Try again.\n", itemId);
             continue;
         }
 
         // Create new order item
-        OrderItem* newItem = (OrderItem*)malloc(sizeof(OrderItem));
-        if (newItem == NULL) {
-            fprintf(stderr, "Memory allocation failed\n");
-            exit(EXIT_FAILURE);
+        OrderItem* newItem = malloc(sizeof(OrderItem));
+        if (!newItem) {
+            printf("Memory allocation failed\n");
+            exit(1);
         }
 
-        newItem->item = menuItem;
+        newItem->item = item;
         newItem->next = NULL;
-        total += menuItem->price;
+        total += item->price;
 
         // Add to linked list
-        if (head == NULL) {
+        if (!head) {
             head = newItem;
             tail = newItem;
         } else {
@@ -697,65 +491,97 @@ void processAddOrder() {
     }
     getchar(); // Consume newline
 
-    if (head == NULL) {
+    if (!head) {
         printf("No items selected. Order cancelled.\n");
         return;
     }
 
     // Create new order
-    Order* newOrder = (Order*)malloc(sizeof(Order));
-    if (newOrder == NULL) {
-        fprintf(stderr, "Memory allocation failed\n");
-        exit(EXIT_FAILURE);
+    Order* newOrder = malloc(sizeof(Order));
+    if (!newOrder) {
+        printf("Memory allocation failed\n");
+        exit(1);
     }
 
-    newOrder->id = orderIdCounter++;
-    strncpy(newOrder->customerName, customerName, MAX_STRING - 1);
-    newOrder->customerName[MAX_STRING - 1] = '\0';
+    newOrder->id = nextOrderId++;
+    strncpy(newOrder->customerName, customerName, 255);
     newOrder->items = head;
     newOrder->completed = false;
     newOrder->total = total;
 
     // Add to queue
-    enqueue(newOrder);
-    printf("Order added successfully!\n");
+    enqueueOrder(newOrder);
+    printf("Order #%d added successfully!\n", newOrder->id);
 }
 
+// Process the next order in queue
 void processNextOrder() {
     if (isQueueEmpty()) {
         printf("No orders to process.\n");
         return;
     }
 
-    Order* order = dequeue();
-    printf("Processing order for %s...\n", order->customerName);
+    Order* order = dequeueOrder();
+    printf("Processing order #%d for %s...\n", order->id, order->customerName);
 
     order->completed = true;
-    push(order);
+    pushOrder(order);
 
     printf("Order processed successfully!\n");
 }
 
+// Display all orders
 void displayOrders() {
-    displayQueue();
-    displayStack();
-}
-
-void processDeleteOrder() {
+    // Active orders
     if (isQueueEmpty()) {
-        printf("No active orders to delete.\n");
-        return;
+        printf("\nNo active orders.\n");
+    } else {
+        printf("\n--- Active Orders ---\n");
+        Node* current = activeOrders.front;
+
+        while (current) {
+            Order* order = current->order;
+            printf("Order ID: %d, Customer: %s\n", order->id, order->customerName);
+            printf("Items:\n");
+
+            OrderItem* item = order->items;
+            while (item) {
+                printf("- %s ($%.2f)\n", item->item->name, item->item->price);
+                item = item->next;
+            }
+
+            printf("Status: Pending\n\n");
+            current = current->next;
+        }
     }
 
-    int id;
-    printf("Enter the ID of the order to cancel: ");
-    scanf("%d", &id);
-    getchar(); // Consume newline
+    // Completed orders
+    if (isStackEmpty()) {
+        printf("No completed orders.\n");
+    } else {
+        printf("--- Completed Orders ---\n");
+        Node* current = completedOrders.top;
 
-    removeOrderFromQueue(id);
+        while (current) {
+            Order* order = current->order;
+            printf("Order ID: %d, Customer: %s\n", order->id, order->customerName);
+            printf("Items:\n");
+
+            OrderItem* item = order->items;
+            while (item) {
+                printf("- %s ($%.2f)\n", item->item->name, item->item->price);
+                item = item->next;
+            }
+
+            printf("Status: Completed\n");
+            printf("Total: $%.2f\n\n", order->total);
+            current = current->next;
+        }
+    }
 }
 
-void calculateTotalRevenue() {
+// Calculate total revenue
+void calculateRevenue() {
     if (isStackEmpty()) {
         printf("No completed orders to calculate revenue.\n");
         return;
@@ -763,47 +589,80 @@ void calculateTotalRevenue() {
 
     printf("\n--- Total Revenue ---\n");
 
-    // Create a temp stack to restore completed orders after calculation
-    Stack tempStack;
-    tempStack.top = NULL;
-    tempStack.size = 0;
-
+    // Temporary stack to restore orders
+    OrderStack tempStack = {NULL, 0};
     float totalRevenue = 0.0;
 
-    // Pop all items from completedOrders, calculate revenue, and push to tempStack
+    // Process all completed orders
     while (!isStackEmpty()) {
-        Order* order = pop();
+        Order* order = completedOrders.top->order;
+        completedOrders.top = completedOrders.top->next;
+        completedOrders.size--;
 
         printf("Order %d: $%.2f\n", order->id, order->total);
         totalRevenue += order->total;
 
-        // Push to temporary stack
-        Node* newNode = (Node*)malloc(sizeof(Node));
-        if (newNode == NULL) {
-            fprintf(stderr, "Memory allocation failed\n");
-            exit(EXIT_FAILURE);
-        }
-
+        // Save to temp stack
+        Node* newNode = malloc(sizeof(Node));
         newNode->order = order;
         newNode->next = tempStack.top;
         tempStack.top = newNode;
         tempStack.size++;
     }
 
-    printf("Total Sold: $%.2f\n", totalRevenue);
+    printf("Total Revenue: $%.2f\n", totalRevenue);
 
-    // Restore completed orders from tempStack
-    while (tempStack.top != NULL) {
+    // Restore from temp stack
+    while (tempStack.top) {
         Node* temp = tempStack.top;
-        Order* order = temp->order;
-
-        push(order);
-
         tempStack.top = tempStack.top->next;
+
+        temp->next = completedOrders.top;
+        completedOrders.top = temp;
+        completedOrders.size++;
+    }
+}
+
+// Clean up memory
+void cleanup() {
+    // Free menu
+    free(menu.items);
+
+    // Free active orders
+    while (!isQueueEmpty()) {
+        Order* order = dequeueOrder();
+
+        // Free order items
+        OrderItem* item = order->items;
+        while (item) {
+            OrderItem* temp = item;
+            item = item->next;
+            free(temp);
+        }
+
+        free(order);
+    }
+
+    // Free completed orders
+    while (!isStackEmpty()) {
+        Order* order = completedOrders.top->order;
+        Node* temp = completedOrders.top;
+        completedOrders.top = completedOrders.top->next;
+
+        // Free order items
+        OrderItem* item = order->items;
+        while (item) {
+            OrderItem* temp = item;
+            item = item->next;
+            free(temp);
+        }
+
+        free(order);
         free(temp);
     }
 }
 
+// Display main menu
 void displayMainMenu() {
     printf("\n--- Restaurant Order Management System ---\n");
     printf("1. Display Menu\n");
@@ -813,9 +672,9 @@ void displayMainMenu() {
     printf("5. Add New Order\n");
     printf("6. Process Next Order\n");
     printf("7. Display Orders\n");
-    printf("8. Delete Order\n");
-    printf("9. Calculate Total Amount of Sold Orders\n");
-    printf("10. Save Completed Orders to File\n");
+    printf("8. Cancel Order\n");
+    printf("9. Calculate Total Revenue\n");
+    printf("10. Save Orders to File\n");
     printf("11. Save Menu to File\n");
     printf("12. Exit\n");
     printf("Enter your choice: ");
@@ -823,12 +682,12 @@ void displayMainMenu() {
 
 int main() {
     // Initialize data structures
-    initDynamicArrayList();
-    initQueue();
-    initStack();
+    initMenu();
+    initOrderQueue();
+    initOrderStack();
 
     // Load menu from file
-    loadMenuFromFile(MENU_FILE);
+    loadMenu("menu.txt");
 
     int choice;
     bool running = true;
@@ -843,16 +702,28 @@ int main() {
                 displayMenu();
                 break;
             case 2:
-                processAddMenuItem();
+                addMenuItemInteractive();
                 break;
             case 3:
-                processDeleteMenuItem();
+                printf("Enter the ID of the menu item to delete: ");
+                int id;
+                scanf("%d", &id);
+                getchar(); // Consume newline
+                removeMenuItem(id);
                 break;
             case 4:
-                processResetMenu();
+                printf("Are you sure you want to reset the menu? (y/n): ");
+                char confirm;
+                scanf(" %c", &confirm);
+                getchar(); // Consume newline
+                if (confirm == 'y' || confirm == 'Y') {
+                    resetMenu();
+                } else {
+                    printf("Menu reset cancelled.\n");
+                }
                 break;
             case 5:
-                processAddOrder();
+                createOrder();
                 break;
             case 6:
                 processNextOrder();
@@ -861,16 +732,20 @@ int main() {
                 displayOrders();
                 break;
             case 8:
-                processDeleteOrder();
+                printf("Enter the ID of the order to cancel: ");
+                int orderId;
+                scanf("%d", &orderId);
+                getchar(); // Consume newline
+                cancelOrder(orderId);
                 break;
             case 9:
-                calculateTotalRevenue();
+                calculateRevenue();
                 break;
             case 10:
-                saveCompletedOrdersToFile(ORDERS_FILE);
+                saveOrders("completed_orders.txt");
                 break;
             case 11:
-                saveMenuToFile(MENU_FILE);
+                saveMenu("menu.txt");
                 break;
             case 12:
                 running = false;
@@ -881,10 +756,8 @@ int main() {
         }
     }
 
-    // Clean up
-    destroyDynamicArrayList();
-    destroyQueue();
-    destroyStack();
+    // Clean up before exit
+    cleanup();
 
     return 0;
 }
