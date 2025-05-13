@@ -1,26 +1,23 @@
-maname: Run C Code
+name: Compile and Run C Code
 
 on:
   push:
     branches:
-      - main
-  pull_request:
-    branches:
-      - main
+      - main  # This will trigger the workflow when you push to the 'main' branch
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # This uses a Linux environment
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2  # This checks out the repository code
 
-      - name: Set up GCC
-        run: sudo apt-get install build-essential
+      - name: Install GCC
+        run: sudo apt-get install gcc  # Install GCC (the C compiler)
 
       - name: Compile C Code
-        run: gcc restmanagement.c -o output
+        run: gcc -o output restmanagement.c  # Compile the C code (replace 'your-c-code.c' with your filename)
 
-      - name: Run the C Code
-        run: ./output
+      - name: Run C Code
+        run: ./output  # Run the compiled C code
