@@ -1,4 +1,4 @@
-name: Run C Code
+maname: Run C Code
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
         run: sudo apt-get install build-essential
 
       - name: Compile C Code
-        run: gcc your-c-code.c -o output
+        run: gcc restmanagement.c -o output
 
       - name: Run the C Code
         run: ./output
